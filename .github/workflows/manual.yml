@@ -25,11 +25,15 @@ jobs:
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
     # Install kubectl tool
-    - name: Kubectl tool installer
-      uses: Azure/setup-kubectl@v1
+    - name: Setup kubectl
+      # You may pin to the exact commit or the version.
+      # uses: ThomasKliszowski/setup-kubectl@525244f0d23a44bdb09d4c150c2f84b6705780c1
+      uses: ThomasKliszowski/setup-kubectl@v1
       with:
-        # Version of kubectl
-        version: ${{ github.event.inputs.kubectl_version }}
+        # Base64 encoded kube config
+        kube-config: ""
+        # Kube version used to download kubectl executable, defaults to latest
+        kube-version: ${{ github.event.inputs.kubectl_version }}
     # Check install result
     - name: Check installed kubectl
       run: |
