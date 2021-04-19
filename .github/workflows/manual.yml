@@ -19,6 +19,8 @@ on:
 jobs:
   # Setup environment needed
   setup_environment:
+    # Use dev environment
+    environment: dev_env
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
 
@@ -31,7 +33,7 @@ jobs:
       uses: ThomasKliszowski/setup-kubectl@v1
       with:
         # Base64 encoded kube config
-        kube-config: ""
+        kube-config: ${{ secrets.KUBE_CONFIG }}
         # Kube version used to download kubectl executable, defaults to latest
         kube-version: ${{ github.event.inputs.kubectl_version }}
     # Check install result
