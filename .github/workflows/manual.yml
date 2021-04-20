@@ -15,7 +15,7 @@ on:
         # Input has to be provided for the workflow to run
         required: true
       input_configmap:
-        description: |
+        description: >-
           ConfigMap to apply. Content is base64 encoded.
           Use following command to generate base64 code:
             cat <<EOF | base64 | tr -d '\n' | xargs echo
