@@ -14,6 +14,17 @@ on:
         default: '1.19.9'
         # Input has to be provided for the workflow to run
         required: true
+      input_configmap:
+        description: |
+          ConfigMap to apply. Content is base64 encoded.
+          Use following command to generate base64 code:
+            cat <<EOF | base64 | tr -d '\n' | xargs echo
+            <your_configmap_yaml>
+            EOF
+        # Default value if no value is explicitly provided
+        default: ''
+        # Input has to be provided for the workflow to run
+        required: false
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -23,7 +34,9 @@ jobs:
     environment: dev_env
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
-
+    # Environment variables
+    env:
+      CONFIGMAP: ${{ github.event.inputs.input_configmap }}
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
     # Install kubectl tool
@@ -40,3 +53,12 @@ jobs:
     - name: Check installed kubectl
       run: |
         kubectl version
+    # Check input ConfigMap
+    - name: Check input ConfigMap
+      run: |
+        if [ -z "$CONFIGMAP" ]
+        then
+          echo "No ConfigMap is input!"
+        else
+          echo "$CONFIGMAP" | base64 -d | kubectl apply -f - --dry-run=client -o yaml
+        fi
