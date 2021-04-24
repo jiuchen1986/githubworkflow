@@ -55,6 +55,9 @@ jobs:
     - name: Check installed kubectl
       run: |
         kubectl version
+    # Checkout local repo
+    - name: Checkout
+      uses: actions/checkout@v2.3.4
     # Check repo content
     - name: Check content in local repo
       run: |
