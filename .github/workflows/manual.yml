@@ -68,7 +68,8 @@ jobs:
       run: |
         if [ -z "$CONFIGMAP" ]
         then
-          echo "No ConfigMap is input!"
+          echo "No ConfigMap is input! Use the one in repo!"
+          kubectl apply -f ${GITHUB_WORKSPACE}/configmap.yml --dry-run=client -o yaml
         else
           echo "$CONFIGMAP" | base64 -d | kubectl apply -f - --dry-run=client -o yaml
         fi
