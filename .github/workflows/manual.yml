@@ -14,17 +14,15 @@ on:
         default: '1.19.9'
         # Input has to be provided for the workflow to run
         required: true
+      # Use following command to generate base64 code:
+      #   cat <<EOF | base64 | tr -d '\n' | xargs echo
+      #   <your_configmap_yaml>
+      #   EOF
       input_configmap:
-        description: >
-          ConfigMap to apply. Content is base64 encoded.
-          
-          Use following command to generate base64 code:
-          
-            cat <<EOF | base64 | tr -d '\n' | xargs echo
-            
-            <your_configmap_yaml>
-            
-            EOF
+        description: |
+          The ConfigMap to apply given as a string from base64 encoding.
+          See the comments in .github/workflows/manual.yml for how to
+          get a base64 encoded ConfigMap.
         # Default value if no value is explicitly provided
         default: ''
         # Input has to be provided for the workflow to run
@@ -57,6 +55,11 @@ jobs:
     - name: Check installed kubectl
       run: |
         kubectl version
+    # Check repo content
+    - name: Check content in local repo
+      run: |
+        echo $GITHUB_WORKSPACE
+        ls -l $GITHUB_WORKSPACE
     # Check input ConfigMap
     - name: Check input ConfigMap
       run: |
