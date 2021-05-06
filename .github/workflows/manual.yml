@@ -93,16 +93,14 @@ jobs:
     - name: Generate configmap with input auto scale groups
       if: ${{ env.AUTO_SCALE_GROUPS != '' }}
       run: |
-        echo "Got input auto scale groups"
+        echo "********** Got input auto scale groups ***********"
         echo ${AUTO_SCALE_GROUPS} | base64 -d | tee autoscalegroups.yaml
-        echo "Generate configmap"
-        kubectl create cm auto-scale-groups -n node-auto-scaler --from-file=autoscalegroups.yaml \
+        echo "********** Generate configmap ************"
+        kubectl apply cm auto-scale-groups -n node-auto-scaler --from-file=autoscalegroups.yaml \
            --dry-run=client -o yaml
-        kubectl create cm auto-scale-groups -n node-auto-scaler --from-file=autoscalegroups.yaml \
-           --dry-run=client -o yaml > ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/auto-scale-groups-configmap.yml
-        cat ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/auto-scale-groups-configmap.yml
     # Apply configmap in the repo
     - name: Create configmap of auto scale groups
+      if: ${{ env.AUTO_SCALE_GROUPS == '' }}
       run: |
         echo "Create configmap"
         kubectl apply -f ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/auto-scale-groups-configmap.yml \
