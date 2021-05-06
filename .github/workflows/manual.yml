@@ -80,9 +80,11 @@ jobs:
       run: |
         kubectl version
     # Check configured kubeconfig
-    - name: Check kubeconfig
+    - name: Check kubeconfig and put into ~/.kube/config
       run: |
         kubectl config view
+        mkdir -p ~/.kube
+        kubectl config view --raw > ~/.kube/config
     # Checkout local repo
     - name: Checkout
       uses: actions/checkout@v2.3.4
