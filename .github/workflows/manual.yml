@@ -8,24 +8,44 @@ on:
   workflow_dispatch:
     # Inputs the workflow accepts.
     inputs:
+      target_env: 
+        description: 'Target github environment to use'
+        default: 'dev_env'
+        required: true
       kubectl_version:
         description: 'Version of kubectl to be installed'
-        # Default value if no value is explicitly provided
         default: '1.19.9'
-        # Input has to be provided for the workflow to run
         required: true
       # Use following command to generate base64 code:
       #   cat <<EOF | base64 | tr -d '\n' | xargs echo
-      #   <your_configmap_yaml>
+      #   <your_autoscalegroups_yaml>
       #   EOF
-      input_configmap:
+      auto_scale_groups:
         description: |
-          The ConfigMap to apply given as a string from base64 encoding.
-          See the comments in .github/workflows/manual.yml for how to
-          get a base64 encoded ConfigMap.
-        # Default value if no value is explicitly provided
+          The auto scale groups defined in yaml to apply given as a string from base64 encoding.
+          See the comments in .github/workflows/manual.yml for how to get a base64 encoded yaml.
+          If this is set to empty, the nodeautoscaler/deploy/auto-scale-groups-configmap.yml in repo will be used.
         default: ''
-        # Input has to be provided for the workflow to run
+        required: false
+      all_peers_ip:
+        description: |
+          The private IPs of all nodes running keepalived talked to AWS separated by comma.
+          For example, "10.0.0.1,10.0.0.2"
+        default: ''
+        required: true
+      eip_alloc_id:
+        description: |
+          The allocation ID of elastic IP in AWS used as the virtual IP in keepalived.
+          If this is set to empty, the value of secret EIP_ALLOC_ID in the input env
+          set by target_env will be used
+        default: ''
+        required: false
+      kube_config:
+        description: |
+          A base64 encoded kubeconfig file content which is used to apply workloads.
+          If this is set to empty, the value of secret KUBE_CONFIG in the input env
+          set by target_env will be used
+        default: ''
         required: false
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
@@ -33,43 +53,70 @@ jobs:
   # Setup environment needed
   setup_environment:
     # Use dev environment
-    environment: dev_env
+    environment: ${{ github.event.inputs.target_env }}
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
-    # Environment variables
-    env:
-      CONFIGMAP: ${{ github.event.inputs.input_configmap }}
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-    # Install kubectl tool
-    - name: Setup kubectl
-      # You may pin to the exact commit or the version.
-      # uses: ThomasKliszowski/setup-kubectl@525244f0d23a44bdb09d4c150c2f84b6705780c1
+    - name: Setup kubectl with input kubeconfig
       uses: ThomasKliszowski/setup-kubectl@v1
+      if: ${{ github.event.inputs.kube_config != '' }}
+      with:
+        # Base64 encoded kube config
+        kube-config: ${{ github.event.inputs.kube_config }}
+        # Kube version used to download kubectl executable, defaults to latest
+        kube-version: ${{ github.event.inputs.kubectl_version }}
+    # Install kubectl tool
+    - name: Setup kubectl with empty input kubeconfig
+      uses: ThomasKliszowski/setup-kubectl@v1
+      if: ${{ github.event.inputs.kube_config == '' }}
       with:
         # Base64 encoded kube config
         kube-config: ${{ secrets.KUBE_CONFIG }}
         # Kube version used to download kubectl executable, defaults to latest
         kube-version: ${{ github.event.inputs.kubectl_version }}
-    # Check install result
+    # Check installed kubectl
     - name: Check installed kubectl
       run: |
         kubectl version
+    # Check configured kubeconfig
+    - name: Check kubeconfig
+      run: |
+        kubectl config view
     # Checkout local repo
     - name: Checkout
       uses: actions/checkout@v2.3.4
-    # Check repo content
-    - name: Check content in local repo
+  # Deploy nodeautoscaler
+  deploy_node_auto_scaler:
+    # Use dev environment
+    environment: ${{ github.event.inputs.target_env }}
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+    # Environment variables
+    env:
+      AUTO_SCALE_GROUPS: ${{ github.event.inputs.auto_scale_groups }}
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+    # Check installed kubectl
+    - name: Check installed kubectl
       run: |
-        echo $GITHUB_WORKSPACE
-        ls -l $GITHUB_WORKSPACE
-    # Check input ConfigMap
-    - name: Check input ConfigMap
+        kubectl version
+    # Check configured kubeconfig
+    - name: Check kubeconfig
       run: |
-        if [ -z "$CONFIGMAP" ]
-        then
-          echo "No ConfigMap is input! Use the one in repo!"
-          kubectl apply -f ${GITHUB_WORKSPACE}/configmap.yml --dry-run=client -o yaml
-        else
-          echo "$CONFIGMAP" | base64 -d | kubectl apply -f - --dry-run=client -o yaml
-        fi
+        kubectl config view
+    # Replace ConfigMap of auto scale groups with input value
+    - name: Generate configmap with input auto scale groups
+      if: ${{ env.AUTO_SCALE_GROUPS != '' }}
+      run: |
+        echo "Got input auto scale groups"
+        echo ${AUTO_SCALE_GROUPS} | base64 -d | tee autoscalegroups.yaml
+        echo "Generate configmap"
+        kubectl create cm auto-scale-groups -n node-auto-scaler --from-file=autoscalegroups.yaml\
+           --dry-run=client -o yaml > ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/auto-scale-groups-configmap.yml
+    # Apply configmap in the repo
+    - name: Create configmap of auto scale groups
+      run: |
+        echo "Create configmap"
+        kubectl apply -f ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/auto-scale-groups-configmap.yml \
+          --dry-run=client -o yaml
