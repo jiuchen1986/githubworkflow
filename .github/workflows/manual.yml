@@ -100,6 +100,7 @@ jobs:
            --dry-run=client -o yaml
         kubectl create cm auto-scale-groups -n node-auto-scaler --from-file=autoscalegroups.yaml \
            --dry-run=client -o yaml > ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/auto-scale-groups-configmap.yml
+        cat ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/auto-scale-groups-configmap.yml
     # Apply configmap in the repo
     - name: Create configmap of auto scale groups
       run: |
