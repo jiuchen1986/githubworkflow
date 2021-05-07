@@ -1,6 +1,6 @@
-# This is a basic workflow that is manually triggered
+# This is a workflow that is manually triggered to deploy supported components other than applications
 
-name: Manual workflow
+name: Manual Deploy Workflow
 
 # Controls when the action will run. Workflow runs when manually triggered using the UI
 # or API.
@@ -59,6 +59,20 @@ on:
           set by target_env will be used
         default: ''
         required: false
+      rancher_url:
+        description: |
+          The URL of target rancher when node auto scaler uses Rancher as backend node provisioner.
+          If set to empty, the value of secret RANCHER_URL in the input env
+          set by target_env will be used
+        default: ''
+        required: false
+      rancher_token:
+        description: |
+          The token string used to talk to target rancher when node auto scaler uses Rancher as backend node provisioner.
+          If set to empty, the value of secret RANCHER_TOKEN in the input env
+          set by target_env will be used
+        default: ''
+        required: false
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -72,6 +86,8 @@ jobs:
     env:
       DRY_RUN: ${{ github.event.inputs.dry_run }}
       AUTO_SCALE_GROUPS: ${{ github.event.inputs.auto_scale_groups }}
+      RANCHER_URL: ${{  github.event.inputs.rancher_url }}
+      RANCHER_TOKEN: ${{ github.event.inputs.rancher_token }}
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
     - name: Setup kubectl with input kubeconfig
@@ -122,7 +138,7 @@ jobs:
         if [ "$DRY_RUN" == 'yes' ]
         then
           echo
-          echo "********** Deploy configmap in dry-run mode************"
+          echo "********** Deploy configmap in dry-run mode ************"
           echo
           kubectl replace -f ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/auto-scale-groups-configmap.yaml \
             --dry-run=client -o yaml
@@ -132,13 +148,53 @@ jobs:
           echo
           kubectl replace -f ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/auto-scale-groups-configmap.yaml -o yaml
         fi
+    - name: Deploy rancher secret
+      if: ${{ contains(github.event.inputs.deploy_components, 'nodeautoscaler') }}
+      env:
+        ENV_RANCHER_URL: ${{ secrets.RANCHER_URL }}
+        ENV_RANCHER_TOKEN: ${{ secrets.RANCHER_TOKEN }}
+      run: |
+        if [ "$RANCHER_URL" == '' ]
+        then
+          echo
+          echo "********** No rancher_url input, use environment secret *************"
+          echo
+          RANCHER_URL=${ENV_RANCHER_URL}
+        fi
+        echo
+        echo "********** Use rancher_url ${RANCHER_URL} *************"
+        echo
+        ENCODE_URL=$(echo ${RANCHER_URL} | base64 | tr -d '\n')
+        sed -i "s/{{ RANCHER_URL }}/${ENCODE_URL}/g" ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/rancher-secret.yaml
+        if [ "$RANCHER_TOKEN" == '' ]
+        then
+          echo
+          echo "********** No rancher_token input, use environment secret *************"
+          echo
+          RANCHER_TOKEN=${ENV_RANCHER_TOKEN}
+        fi
+        ENCODE_TOKEN=$(echo ${RANCHER_TOKEN} | base64 | tr -d '\n')
+        sed -i "s/{{ RANCHER_TOKEN }}/${ENCODE_TOKEN}/g" ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/rancher-secret.yaml
+        if [ "$DRY_RUN" == 'yes' ]
+        then
+          echo
+          echo "********** Deploy secret in dry-run mode ************"
+          echo
+          kubectl replace -f ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/rancher-secret.yaml \
+            --dry-run=client -o yaml
+        else
+          echo
+          echo "********** Deploy secret ************"
+          echo
+          kubectl replace -f ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/rancher-secret.yaml -o yaml
+        fi
     - name: Deploy node auto scaler
       if: ${{ contains(github.event.inputs.deploy_components, 'nodeautoscaler') }}
       run: |
         if [ "$DRY_RUN" == 'yes' ]
         then
           echo
-          echo "********** Deploy node auto scaler in dry-run mode************"
+          echo "********** Deploy node auto scaler in dry-run mode ************"
           echo
           kubectl apply -f ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/node-auto-scaler-manifests.yaml \
             --dry-run=client -o yaml
