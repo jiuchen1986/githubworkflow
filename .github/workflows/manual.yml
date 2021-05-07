@@ -52,24 +52,10 @@ on:
           set by target_env will be used
         default: ''
         required: false
-      kube_config:
-        description: |
-          A base64 encoded kubeconfig file content which is used to apply workloads.
-          If set to empty, the value of secret KUBE_CONFIG in the input env
-          set by target_env will be used
-        default: ''
-        required: false
       rancher_url:
         description: |
           The URL of target rancher when node auto scaler uses Rancher as backend node provisioner.
           If set to empty, the value of secret RANCHER_URL in the input env
-          set by target_env will be used
-        default: ''
-        required: false
-      rancher_token:
-        description: |
-          The token string used to talk to target rancher when node auto scaler uses Rancher as backend node provisioner.
-          If set to empty, the value of secret RANCHER_TOKEN in the input env
           set by target_env will be used
         default: ''
         required: false
@@ -87,20 +73,11 @@ jobs:
       DRY_RUN: ${{ github.event.inputs.dry_run }}
       AUTO_SCALE_GROUPS: ${{ github.event.inputs.auto_scale_groups }}
       RANCHER_URL: ${{  github.event.inputs.rancher_url }}
-      RANCHER_TOKEN: ${{ github.event.inputs.rancher_token }}
+      RANCHER_TOKEN: ${{ secrets.RANCHER_TOKEN }}
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-    - name: Setup kubectl with input kubeconfig
-      uses: ThomasKliszowski/setup-kubectl@v1
-      if: ${{ github.event.inputs.kube_config != '' }}
-      with:
-        # Base64 encoded kube config
-        kube-config: ${{ github.event.inputs.kube_config }}
-        # Kube version used to download kubectl executable, defaults to latest
-        kube-version: ${{ github.event.inputs.kubectl_version }}
     - name: Setup kubectl with empty input kubeconfig
       uses: ThomasKliszowski/setup-kubectl@v1
-      if: ${{ github.event.inputs.kube_config == '' }}
       with:
         # Base64 encoded kube config
         kube-config: ${{ secrets.KUBE_CONFIG }}
@@ -152,7 +129,6 @@ jobs:
       if: ${{ contains(github.event.inputs.deploy_components, 'nodeautoscaler') }}
       env:
         ENV_RANCHER_URL: ${{ secrets.RANCHER_URL }}
-        ENV_RANCHER_TOKEN: ${{ secrets.RANCHER_TOKEN }}
       run: |
         if [ "$RANCHER_URL" == '' ]
         then
@@ -161,18 +137,8 @@ jobs:
           echo
           RANCHER_URL=${ENV_RANCHER_URL}
         fi
-        echo
-        echo "********** Use rancher_url ${RANCHER_URL} *************"
-        echo
         ENCODE_URL=$(echo ${RANCHER_URL} | base64 | tr -d '\n')
         sed -i "s/{{ RANCHER_URL }}/${ENCODE_URL}/g" ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/rancher-secret.yaml
-        if [ "$RANCHER_TOKEN" == '' ]
-        then
-          echo
-          echo "********** No rancher_token input, use environment secret *************"
-          echo
-          RANCHER_TOKEN=${ENV_RANCHER_TOKEN}
-        fi
         ENCODE_TOKEN=$(echo ${RANCHER_TOKEN} | base64 | tr -d '\n')
         sed -i "s/{{ RANCHER_TOKEN }}/${ENCODE_TOKEN}/g" ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/rancher-secret.yaml
         if [ "$DRY_RUN" == 'yes' ]
