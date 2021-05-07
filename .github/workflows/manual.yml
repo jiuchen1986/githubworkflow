@@ -103,13 +103,11 @@ jobs:
         echo ${AUTO_SCALE_GROUPS} | base64 -d | tee autoscalegroups.yaml
         echo "********** Generate configmap ************"
         kubectl create cm auto-scale-groups -n node-auto-scaler --from-file=autoscalegroups.yaml \
-           --dry-run=client -o yaml > auto-scale-groups-configmap.yml
-        echo "********** Deploy configmap ************"
-        kubectl apply -f auto-scale-groups-configmap.yml --dry-run=client -o yaml
+           --dry-run=client -o yaml | tee ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/auto-scale-groups-configmap.yml
     # Apply configmap in the repo
-    - name: Create configmap of auto scale groups
+    - name: Deploy configmap of auto scale groups
       if: ${{ env.AUTO_SCALE_GROUPS == '' && contains(github.event.inputs.deploy_components, 'nodeautoscaler') }}
       run: |
         echo "********** Deploy configmap ************"
-        kubectl apply -f ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/auto-scale-groups-configmap.yml \
+        kubectl replace -f ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/auto-scale-groups-configmap.yml \
           --dry-run=client -o yaml
