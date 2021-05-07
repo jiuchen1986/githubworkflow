@@ -50,32 +50,20 @@ on:
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # Deploy workloads
-  deploy_workloads:
+  # Setup environment needed
+  setup_environment:
     # Use dev environment
     environment: ${{ github.event.inputs.target_env }}
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
     # Environment variables
-    env:
-      AUTO_SCALE_GROUPS: ${{ github.event.inputs.auto_scale_groups }}
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
     - name: Setup kubectl with input kubeconfig
       uses: ThomasKliszowski/setup-kubectl@v1
-      if: ${{ github.event.inputs.kube_config != '' }}
       with:
         # Base64 encoded kube config
-        kube-config: ${{ github.event.inputs.kube_config }}
-        # Kube version used to download kubectl executable, defaults to latest
-        kube-version: ${{ github.event.inputs.kubectl_version }}
-    # Install kubectl tool
-    - name: Setup kubectl with empty input kubeconfig
-      uses: ThomasKliszowski/setup-kubectl@v1
-      if: ${{ github.event.inputs.kube_config == '' }}
-      with:
-        # Base64 encoded kube config
-        kube-config: ${{ secrets.KUBE_CONFIG }}
+        kube-config: ''
         # Kube version used to download kubectl executable, defaults to latest
         kube-version: ${{ github.event.inputs.kubectl_version }}
     # Check installed kubectl
@@ -83,12 +71,22 @@ jobs:
       run: |
         kubectl version
     # Check configured kubeconfig
-    - name: Check kubeconfig
+    - name: Check and persist kubeconfig
       run: |
         kubectl config view
     # Checkout local repo
-    - name: Checkout
+    - name: Checkout local repo
       uses: actions/checkout@v2.3.4
+  # Deploy workloads
+  deploy_nodeautoscaler:
+    # Use dev environment
+    environment: ${{ github.event.inputs.target_env }}
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+    # Environment variables
+    env:
+      AUTO_SCALE_GROUPS: ${{ github.event.inputs.auto_scale_groups }}
+    steps:
     # Replace ConfigMap of auto scale groups with input value
     - name: Generate configmap with input auto scale groups
       if: ${{ env.AUTO_SCALE_GROUPS != '' }}
@@ -96,8 +94,8 @@ jobs:
         echo "********** Got input auto scale groups ***********"
         echo ${AUTO_SCALE_GROUPS} | base64 -d | tee autoscalegroups.yaml
         echo "********** Generate configmap ************"
-        kubectl apply cm auto-scale-groups -n node-auto-scaler --from-file=autoscalegroups.yaml \
-           --dry-run=client -o yaml
+        kubectl create cm auto-scale-groups -n node-auto-scaler --from-file=autoscalegroups.yaml \
+           --dry-run=client -o yaml | tee auto-scale-groups-configmap.yml
     # Apply configmap in the repo
     - name: Create configmap of auto scale groups
       if: ${{ env.AUTO_SCALE_GROUPS == '' }}
