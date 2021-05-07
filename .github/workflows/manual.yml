@@ -12,6 +12,12 @@ on:
         description: 'Target github environment to use'
         default: 'dev_env'
         required: true
+      deploy_components:
+        description: |
+          Components to deploy separated by commas.
+          Support "nodeautoscaler", "lb", "keepalived".
+        default: 'nodeautoscaler,lb,keepalived'
+        required: true
       kubectl_version:
         description: 'Version of kubectl to be installed'
         default: '1.19.9'
@@ -50,14 +56,15 @@ on:
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # Setup environment needed
-  setup_environment:
+  # Deploy components
+  deploy:
     # Use dev environment
     environment: ${{ github.event.inputs.target_env }}
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
-    outputs:
-      kubeconfig_path: ${{ steps.step_kubeconfig.outputs.kubeconfig_path }}
+    # Environment variables
+    env:
+      AUTO_SCALE_GROUPS: ${{ github.event.inputs.auto_scale_groups }}
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
     - name: Setup kubectl with input kubeconfig
@@ -85,39 +92,24 @@ jobs:
       id: step_kubeconfig
       run: |
         kubectl config view
-        kubectl config view --raw > /tmp/kubeconfig
-        echo "::set-output name=kubeconfig_path::/tmp/kubeconfig"
     # Checkout local repo
     - name: Checkout local repo
       uses: actions/checkout@v2.3.4
-  # Deploy workloads
-  deploy_nodeautoscaler:
-    # Use dev environment
-    environment: ${{ github.event.inputs.target_env }}
-    # The type of runner that the job will run on
-    runs-on: ubuntu-latest
-    needs: setup_environment
-    # Environment variables
-    env:
-      AUTO_SCALE_GROUPS: ${{ github.event.inputs.auto_scale_groups }}
-      KUBECONFIG: ${{ needs.setup_environment.outputs.kubeconfig_path }}
-    steps:
-    - name: Check kubeconfig
-      run: |
-        kubectl config view
     # Replace ConfigMap of auto scale groups with input value
-    - name: Generate configmap with input auto scale groups
-      if: ${{ env.AUTO_SCALE_GROUPS != '' }}
+    - name: Generate configmap with auto scale groups
+      if: ${{ env.AUTO_SCALE_GROUPS != '' && contains(github.event.inputs.deploy_components, 'nodeautoscaler') }}
       run: |
         echo "********** Got input auto scale groups ***********"
         echo ${AUTO_SCALE_GROUPS} | base64 -d | tee autoscalegroups.yaml
         echo "********** Generate configmap ************"
         kubectl create cm auto-scale-groups -n node-auto-scaler --from-file=autoscalegroups.yaml \
-           --dry-run=client -o yaml | tee auto-scale-groups-configmap.yml
+           --dry-run=client -o yaml > auto-scale-groups-configmap.yml
+        echo "********** Deploy configmap ************"
+        kubectl apply -f auto-scale-groups-configmap.yml --dry-run=client -o yaml
     # Apply configmap in the repo
     - name: Create configmap of auto scale groups
-      if: ${{ env.AUTO_SCALE_GROUPS == '' }}
+      if: ${{ env.AUTO_SCALE_GROUPS == '' && contains(github.event.inputs.deploy_components, 'nodeautoscaler') }}
       run: |
-        echo "Create configmap"
+        echo "********** Deploy configmap ************"
         kubectl apply -f ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/auto-scale-groups-configmap.yml \
           --dry-run=client -o yaml
