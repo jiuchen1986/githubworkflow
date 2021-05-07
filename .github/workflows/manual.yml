@@ -106,30 +106,45 @@ jobs:
     - name: Generate configmap with auto scale groups
       if: ${{ env.AUTO_SCALE_GROUPS != '' && contains(github.event.inputs.deploy_components, 'nodeautoscaler') }}
       run: |
-        echo "********** Got input auto scale groups ***********"
         echo
+        echo "********** Got input auto scale groups ***********"
         echo
         echo ${AUTO_SCALE_GROUPS} | base64 -d | tee autoscalegroups.yaml
         echo
-        echo
         echo "********** Generate configmap ************"
+        echo
         kubectl create cm auto-scale-groups -n node-auto-scaler --from-file=autoscalegroups.yaml \
-           --dry-run=client -o yaml | tee ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/auto-scale-groups-configmap.yml
+           --dry-run=client -o yaml | tee ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/auto-scale-groups-configmap.yaml
     # Apply configmap in the repo
     - name: Deploy configmap of auto scale groups
       if: ${{ contains(github.event.inputs.deploy_components, 'nodeautoscaler') }}
       run: |
         if [ "$DRY_RUN" == 'yes' ]
         then
+          echo
           echo "********** Deploy configmap in dry-run mode************"
           echo
-          echo
-          kubectl replace -f ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/auto-scale-groups-configmap.yml \
+          kubectl replace -f ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/auto-scale-groups-configmap.yaml \
             --dry-run=client -o yaml
         else
+          echo
           echo "********** Deploy configmap ************"
           echo
+          kubectl replace -f ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/auto-scale-groups-configmap.yaml -o yaml
+        fi
+    - name: Deploy node auto scaler
+      if: ${{ contains(github.event.inputs.deploy_components, 'nodeautoscaler') }}
+      run: |
+        if [ "$DRY_RUN" == 'yes' ]
+        then
           echo
-          kubectl replace -f ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/auto-scale-groups-configmap.yml \
+          echo "********** Deploy node auto scaler in dry-run mode************"
+          echo
+          kubectl apply -f ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/node-auto-scaler-manifests.yaml \
             --dry-run=client -o yaml
+        else
+          echo
+          echo "********** Deploy node auto scaler ************"
+          echo
+          kubectl replace -f ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/node-auto-scaler-manifests.yaml -o yaml
         fi
