@@ -18,6 +18,12 @@ on:
           Support "nodeautoscaler", "lb", "keepalived".
         default: 'nodeautoscaler,lb,keepalived'
         required: true
+      dry_run:
+        description: |
+          If set to 'yes', run all deployment in dry-run mode.
+          Otherwise, set to 'no'.
+        default: 'yes'
+        required: true
       kubectl_version:
         description: 'Version of kubectl to be installed'
         default: '1.19.9'
@@ -42,14 +48,14 @@ on:
       eip_alloc_id:
         description: |
           The allocation ID of elastic IP in AWS used as the virtual IP in keepalived.
-          If this is set to empty, the value of secret EIP_ALLOC_ID in the input env
+          If set to empty, the value of secret EIP_ALLOC_ID in the input env
           set by target_env will be used
         default: ''
         required: false
       kube_config:
         description: |
           A base64 encoded kubeconfig file content which is used to apply workloads.
-          If this is set to empty, the value of secret KUBE_CONFIG in the input env
+          If set to empty, the value of secret KUBE_CONFIG in the input env
           set by target_env will be used
         default: ''
         required: false
@@ -64,6 +70,7 @@ jobs:
     runs-on: ubuntu-latest
     # Environment variables
     env:
+      DRY_RUN: ${{ github.event.inputs.dry_run }}
       AUTO_SCALE_GROUPS: ${{ github.event.inputs.auto_scale_groups }}
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
@@ -100,14 +107,29 @@ jobs:
       if: ${{ env.AUTO_SCALE_GROUPS != '' && contains(github.event.inputs.deploy_components, 'nodeautoscaler') }}
       run: |
         echo "********** Got input auto scale groups ***********"
+        echo
+        echo
         echo ${AUTO_SCALE_GROUPS} | base64 -d | tee autoscalegroups.yaml
+        echo
+        echo
         echo "********** Generate configmap ************"
         kubectl create cm auto-scale-groups -n node-auto-scaler --from-file=autoscalegroups.yaml \
            --dry-run=client -o yaml | tee ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/auto-scale-groups-configmap.yml
     # Apply configmap in the repo
     - name: Deploy configmap of auto scale groups
-      if: ${{ env.AUTO_SCALE_GROUPS == '' && contains(github.event.inputs.deploy_components, 'nodeautoscaler') }}
+      if: ${{ contains(github.event.inputs.deploy_components, 'nodeautoscaler') }}
       run: |
-        echo "********** Deploy configmap ************"
-        kubectl replace -f ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/auto-scale-groups-configmap.yml \
-          --dry-run=client -o yaml
+        if [ "$DRY_RUN" == 'yes' ]
+        then
+          echo "********** Deploy configmap in dry-run mode************"
+          echo
+          echo
+          kubectl replace -f ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/auto-scale-groups-configmap.yml \
+            --dry-run=client -o yaml
+        else
+          echo "********** Deploy configmap ************"
+          echo
+          echo
+          kubectl replace -f ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/auto-scale-groups-configmap.yml \
+            --dry-run=client -o yaml
+        fi
