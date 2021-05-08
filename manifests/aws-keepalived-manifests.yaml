@@ -6,9 +6,9 @@ data:
   # allocation id of elastic IP
   allocation_id: {{ EIP_ALLOC_ID }}
   # default targeting aws region
-  aws_default_region: us-east-1
+  aws_default_region: {{ AWS_DEFAULT_REGION }}
   # primary nic name on the host running keepalived
-  primary_nic: ens5
+  primary_nic: {{ PRIMARY_NIC }}
 kind: ConfigMap
 metadata:
   creationTimestamp: null
