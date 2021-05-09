@@ -229,3 +229,18 @@ jobs:
           echo
           kubectl replace -f ${GITHUB_WORKSPACE}/manifests/aws-keepalived-manifests.yaml -o yaml
         fi
+    - name: Deploy LB
+      if: ${{ contains(github.event.inputs.deploy_components, 'lb') }}
+      run: |
+        if [ "$DRY_RUN" == 'yes' ]
+        then
+          echo
+          echo "********** Deploy keepalived in dry-run mode ************"
+          echo
+          kubectl replace -f ${GITHUB_WORKSPACE}/manifests/haproxy-ingress-manifests.yaml --dry-run=client -o yaml
+        else
+          echo
+          echo "********** Deploy keepalived ************"
+          echo
+          kubectl replace -f ${GITHUB_WORKSPACE}/manifests/haproxy-ingress-manifests.yaml -o yaml
+        fi
