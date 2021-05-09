@@ -47,7 +47,10 @@ on:
       eip_alloc_id:
         description: |
           The allocation ID of elastic IP in AWS used as the virtual IP in keepalived.
-        required: true
+          If this is set to empty, the secret EIP_ALLOC_ID in the specified environment
+          input by target_env will be used.
+        default: ''
+        required: false
       aws_default_region:
         description: |
           The default AWS region connected by keepalived.
@@ -205,11 +208,18 @@ jobs:
         EIP_ALLOC_ID: ${{ github.event.inputs.eip_alloc_id }}
         AWS_DEFAULT_REGION: ${{ github.event.inputs.aws_default_region }}
         PRIMARY_NIC_NAME: ${{ github.event.inputs.primary_nic_name }}
+        ENV_EIP_ALLOC_ID: ${{ secrets.EIP_ALLOC_ID }}
       if: ${{ contains(github.event.inputs.deploy_components, 'keepalived') }}
       run: |
         echo
         echo "*********** All peers IP: ${ALL_PPERS_IP} **********"
-        echo "*********** Elastic IP alloc ID: ${EIP_ALLOC_ID} **********"
+        if [ "$EIP_ALLOC_ID" != '' ]
+        then
+          echo "*********** Elastic IP alloc ID: ${EIP_ALLOC_ID} **********"
+        else
+          echo "*********** No input elastic IP alloc ID, use environment secret **********"
+          EIP_ALLOC_ID=${ENV_EIP_ALLOC_ID}
+        fi
         echo "*********** AWS default region: ${AWS_DEFAULT_REGION} **********"
         echo "*********** Primary NIC: ${PRIMARY_NIC_NAME} **********"
         echo
