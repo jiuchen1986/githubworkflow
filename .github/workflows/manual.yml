@@ -53,7 +53,7 @@ on:
           The default AWS region connected by keepalived.
         default: 'us-east-1'
         required: true
-      primary_nic:
+      primary_nic_name:
         description: |
           The primary NIC on the host that will be assigned VIP by keepalived.
         default: 'ens5'
@@ -204,28 +204,28 @@ jobs:
         ALL_PPERS_IP: ${{ github.event.inputs.all_peers_ip }}
         EIP_ALLOC_ID: ${{ github.event.inputs.eip_alloc_id }}
         AWS_DEFAULT_REGION: ${{ github.event.inputs.aws_default_region }}
-        PRIMARY_NIC: ${{ github.event.inputs.primary_nic }}
+        PRIMARY_NIC_NAME: ${{ github.event.inputs.primary_nic_name }}
       if: ${{ contains(github.event.inputs.deploy_components, 'keepalived') }}
       run: |
         echo
         echo "*********** All peers IP: ${ALL_PPERS_IP} **********"
         echo "*********** Elastic IP alloc ID: ${EIP_ALLOC_ID} **********"
         echo "*********** AWS default region: ${AWS_DEFAULT_REGION} **********"
-        echo "*********** Primary NIC: ${PRIMARY_NIC} **********"
+        echo "*********** Primary NIC: ${PRIMARY_NIC_NAME} **********"
         echo
-        ENCODE_ID=$(echo ${AWS_ACCESS_KEY_ID} | base64 | tr -d '\n')
-        sed -i "s/{{ AWS_ACCESS_KEY_ID }}/${ENCODE_ID}/g" ${GITHUB_WORKSPACE}/manifests/aws-secret.yaml
-        ENCODE_KEY=$(echo ${AWS_SECRET_ACCESS_KEY} | base64 | tr -d '\n')
-        sed -i "s/{{ AWS_SECRET_ACCESS_KEY }}/${ENCODE_KEY}/g" ${GITHUB_WORKSPACE}/manifests/aws-secret.yaml
+        sed -i "s/{{ ALL_PPERS_IP }}/${ALL_PPERS_IP}/g" ${GITHUB_WORKSPACE}/manifests/aws-keepalived-manifests.yaml
+        sed -i "s/{{ EIP_ALLOC_ID }}/${EIP_ALLOC_ID}/g" ${GITHUB_WORKSPACE}/manifests/aws-keepalived-manifests.yaml
+        sed -i "s/{{ AWS_DEFAULT_REGION }}/${AWS_DEFAULT_REGION}/g" ${GITHUB_WORKSPACE}/manifests/aws-keepalived-manifests.yaml
+        sed -i "s/{{ PRIMARY_NIC_NAME }}/${PRIMARY_NIC_NAME}/g" ${GITHUB_WORKSPACE}/manifests/aws-keepalived-manifests.yaml
         if [ "$DRY_RUN" == 'yes' ]
         then
           echo
-          echo "********** Deploy secret in dry-run mode ************"
+          echo "********** Deploy keepalived in dry-run mode ************"
           echo
-          kubectl replace -f ${GITHUB_WORKSPACE}/manifests/aws-secret.yaml --dry-run=client
+          kubectl replace -f ${GITHUB_WORKSPACE}/manifests/aws-keepalived-manifests.yaml --dry-run=client -o yaml
         else
           echo
-          echo "********** Deploy secret ************"
+          echo "********** Deploy keepalived ************"
           echo
-          kubectl replace -f ${GITHUB_WORKSPACE}/manifests/aws-secret.yaml
+          kubectl replace -f ${GITHUB_WORKSPACE}/manifests/aws-keepalived-manifests.yaml -o yaml
         fi
