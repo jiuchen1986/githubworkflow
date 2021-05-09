@@ -53,7 +53,8 @@ on:
         required: false
       aws_default_region:
         description: |
-          The default AWS region connected by keepalived.
+          The default AWS region connected by keepalived. This must match the granted permission
+          to AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY stored in environement secrets.
         default: 'us-east-1'
         required: true
       primary_nic_name:
