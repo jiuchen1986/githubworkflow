@@ -43,7 +43,9 @@ on:
         description: |
           The private IPs of all nodes running keepalived talked to AWS separated by comma.
           For example, "10.0.0.1,10.0.0.2"
-        required: true
+          This must be non-empty if keepalived is deployed.
+        default: ''
+        required: false
       eip_alloc_id:
         description: |
           The allocation ID of elastic IP in AWS used as the virtual IP in keepalived.
@@ -212,6 +214,13 @@ jobs:
         ENV_EIP_ALLOC_ID: ${{ secrets.EIP_ALLOC_ID }}
       if: ${{ contains(github.event.inputs.deploy_components, 'keepalived') }}
       run: |
+        set -e
+        if [ "$ALL_PPERS_IP" == '' ]
+        then
+          echo
+          echo "*********** ALL_PPERS_IP can not be empty **********"
+          exit 1
+        fi
         echo
         echo "*********** All peers IP: ${ALL_PPERS_IP} **********"
         if [ "$EIP_ALLOC_ID" != '' ]
